@@ -1,0 +1,644 @@
+from networkx.generators.community import LFR_benchmark_graph
+import networkx as nx
+import matplotlib.pyplot as plt
+import numpy as np
+import statistics
+from random import choice
+from random import sample
+from shutil import copyfile
+import sys
+import pandas as pd
+import os 
+import xlsxwriter
+import time
+
+
+# n = 200
+# m = 500
+start_time = time.time()
+# initial setup
+
+
+df_distance_ave = pd.DataFrame()
+df_original_opinion = pd.DataFrame()
+it_new = []
+
+for experiment in range (50):
+    count_first=0
+    iteration_first=0
+    # Reading graph 1 structure
+    G1 =nx.read_weighted_edgelist("project/graph1.edgelist", create_using = nx.Graph(), nodetype = int)
+    # Reading graph 2 structure
+    G2 =nx.read_weighted_edgelist("project/graph2.edgelist", create_using = nx.Graph(), nodetype = int)
+
+    # Reading node attributes of Population 1
+    with open("project/node_attr1.txt", "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            a = []
+            line = line.split(':')
+            node = int(line[0])
+            belief1 = line[1]
+            acceptance= int(line[2])/100
+            removed = ''
+            for j in belief1:
+                if(j == '[' or j == ']'):
+                    continue
+                else:
+                    removed += j
+                new = removed.split()
+            for j in new:
+                x = int(j)
+                a.append(x)
+            results = np.array(a)
+            attrs = {
+                'beliefspace' : results,
+                'population' : 1,
+                'distance_in' : 0,
+                'distance_out' : 0,
+                'acceptance': acceptance
+            }
+            G1.add_node(node, **attrs)
+            
+            
+    
+           
+    # Reading graph 1 attribute
+    with open("project/graph1_attr.txt") as fi:
+        lines = fi.readlines()
+        belief1 = lines[0]
+        new = []
+        a = []
+        removed2 = ''
+        for j in belief1:
+            if(j == '[' or j == ']'):
+                continue
+            else:
+                removed2 += j
+            new = removed2.split()
+        for j in new:
+            x = int(j)
+            a.append(x)
+        results2 = np.array(a)
+        G1.graph['beliefspace'] = results2
+        g1_weight = float(lines[1])
+        G1.graph['weight'] = g1_weight
+        g1_sd = float(lines[2])
+        G1.graph['sd'] = g1_sd
+        
+        
+        
+
+    # Reading node attributes of Population 2
+    with open("project/node_attr2.txt", "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            a = []
+            line = line.split(':')
+            node = int(line[0])
+            belief2 = line[1]
+            acceptance = int(line[2])/100
+            removed = ''
+            for j in belief2:
+                if(j == '[' or j == ']'):
+                    continue
+                else:
+                    removed += j
+                new = removed.split()
+            for j in new:
+                x = int(j)
+                a.append(x)
+            results = np.array(a)
+            attrs = {
+                'beliefspace' : results,
+                'population' : 2,
+                'distance_in' : 0,
+                'distance_out' : 0,
+                'acceptance': acceptance
+            }
+            G2.add_node(node, **attrs)
+
+    
+    
+    # Reading graph 2 attribute
+    with open('project/graph2_attr.txt') as fi:
+        lines = fi.readlines()
+        belief1 = lines[0]
+        removed2 = []
+        belief1 = belief1.replace("[", "")
+        new = belief1.replace("]", "")
+        new = new.replace(",", "")
+        belief1 = new.split()
+        for j in belief1:
+            removed2.append(int (j))
+        results2 = np.array(removed2)
+        G2.graph['beliefspace'] = results2
+        g2_weight = float(lines[1])
+        G2.graph['weight'] = g2_weight
+        g2_sd = float(lines[2])
+        G2.graph['sd'] = g2_sd
+        
+     
+    
+   
+    #functions
+
+    def setWeight(G):
+        for i in G.nodes:
+            for x in G.edges(i):
+                k = 0  # k = coefficient
+                distance = 0  # abs(difference) of elements
+                Total_dis = 0
+                for j in range(10):
+                    distance = abs(G.nodes[i]['beliefspace'][j] - G.nodes[x[1]]['beliefspace'][j])
+                    if distance != 0:
+                        Total_dis += distance
+                        k = k + 1
+                    else:
+                        continue
+                G.edges[i, x[1]]["weight"] = (k * (Total_dis / 100)) / 100
+                
+         
+    
+    def takeSecond(elem):
+        return elem[1]
+
+
+    def sorting(n):
+        for i in G1.nodes:
+            if (n == G1):
+                y.append([i, G1.nodes[i].get('distance_in')])
+            if (n == G2):
+                y.append([i, G1.nodes[i].get('distance_out')])
+
+        y.sort(key=takeSecond)
+
+    #Create a list of 20 individuals for scenario 3 and 4
+    def create_list(numbers, rangee):
+        community_list = []
+        if (rangee == 0):
+            for i in range(numbers):
+                community_list.append(y[i][0])
+
+            ind = np.random.choice(community_list)
+            return ind
+        if (rangee == 1):
+            for i in range(n-20, n):
+                community_list.append(y[i][0])
+
+            ind = np.random.choice(community_list)
+            return ind
+
+     # selecting an individual
+    #scenario = int(input("Select an individual: \n 1. Elite \n 2. Random \n 3. Similar to destination Population \n 4. Isolated \n"))
+    
+    scenario=2
+    global y
+    y = []
+
+
+    individual = 0
+    distance_in(G1)
+    distance_in(G2)
+    distance_out(G1,G2)
+    distance_out(G2,G1)
+    setWeight(G1)
+    setWeight(G2)
+    
+    
+    
+    
+    if (scenario == 1):
+        sorting(G1)
+        individual = create_list(20, 0)
+        
+    if (scenario == 2):
+        individual = np.random.randint(0, G1.number_of_nodes())
+
+    if (scenario == 3):
+        sorting(G2)
+        individual = create_list(20, 0)
+        
+    if (scenario == 4):
+        sorting(G1)
+        individual = create_list(0, 1)
+        
+        
+    
+    
+    # migration
+    Belief = G1.nodes[individual]["beliefspace"]
+    Pop_flag = G1.nodes[individual]["population"]
+    acceptance_1= G1.nodes[individual]["acceptance"]
+    
+    migrated_individual = G2.number_of_nodes()
+
+    G2.add_node(migrated_individual, beliefspace=Belief, population=Pop_flag, acceptance= acceptance_1, distance_out=0, distance_in=0)
+    
+    original_belief = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    for i in range(10):
+        original_belief[i] = G2.nodes[migrated_individual]['beliefspace'][i]
+    
+    
+    def original_opinion():
+            k = 0  # k = coefficient
+            distance = 0  # abs(difference) of elements
+            Total_dis = 0
+            for j in range(10):
+                distance = abs(G2.nodes[migrated_individual]['beliefspace'][j] - original_belief[j])
+                if distance != 0:
+                    Total_dis += distance
+                    k = k + 1
+            dis = k * (Total_dis / 10)
+            return dis
+        
+        
+    #Finding the best community to connect to
+    com2_dis = dis_btw_inds(com2_list)
+    com3_dis = dis_btw_inds(com3_list)
+    
+    
+    sum2 = 0
+    sum3 = 0
+    
+    
+    for i,j in com2_dis:
+        sum2 += j 
+    ave2 = (sum2/len(com2_dis))
+    
+    
+    for i,j in com3_dis:
+        sum3 += j 
+    ave3 = (sum3/len(com3_dis))
+    
+    
+    
+    
+    # option 1 : Random
+    
+#     selected_ind = np.random.randint(0,(G2.number_of_nodes()-1))
+#     G2.add_edge(migrated_individual, selected_ind)
+#     setWeight(G2)
+    
+    
+    # option 2 : connect to the most similar person
+    
+#     x_list = np.random.randint(0, G2.number_of_nodes() - 1, 23)
+#     list_of_dis = []
+#     list_of_dis = dis_btw_inds(x_list)
+#     list_of_dis.sort(key=takeSecond)
+#     selected_ind = list_of_dis[0][0]
+#     G2.add_edge(migrated_individual, selected_ind)
+#     setWeight(G2)
+    
+    # option 3 : connect to a community           
+        
+    if( ave2 < ave3):
+        for i in range(3):
+            selected_ind = np.random.choice(com2_list)
+            G2.add_edge(migrated_individual, selected_ind)
+            
+        
+    else:
+        for i in range(3):
+            selected_ind = np.random.choice(com3_list)
+            G2.add_edge(migrated_individual, selected_ind)
+            
+        
+    G2.add_edge(migrated_individual, selected_ind)
+    setWeight(G2)
+
+
+    
+    
+    # copying previous files
+    file_name = str(experiment) 
+    file_address="project/copy/files/" 
+    
+    copyfile("project/node_attr1.txt", file_address + file_name + "_node_attr1_copy.txt")
+    copyfile("project/graph1.edgelist", file_address + file_name + "_graph1_copy.edgelist")
+    copyfile("project/graph1_attr.txt", file_address + file_name + "_graph1_attr_copy.txt")
+
+    copyfile("project/node_attr2.txt", file_address + file_name + "_node_attr2_copy.txt")
+    copyfile("project/graph2.edgelist", file_address + file_name + "_graph2_copy.edgelist")
+    copyfile("project/graph2_attr.txt", file_address + file_name + "_graph2_attr_copy.txt")
+
+    # adding new edge to file
+    new_node_to_string = str(migrated_individual)
+    selected_to_string = str(selected_ind)
+    weights = str(G2.edges[migrated_individual, selected_ind]['weight'])
+
+    with open(file_address + file_name + "_graph2_copy.edgelist", 'a') as f:
+        f.write(new_node_to_string + " " + selected_to_string + " " + weights + "\n")
+
+    # adding new node attribute to file
+    with open(file_address + file_name + "_node_attr2_copy.txt", 'a') as f:
+        f.write("--------------------migration------------------" + "\n")
+        f.write(new_node_to_string + ":" + str(G2.nodes[migrated_individual]['beliefspace']) + "\n")
+
+
+    
+    distance_in(G1)
+    distance_in(G2)
+    distance_out(G1,G2)
+    distance_out(G2,G1)
+    
+    
+    #creating a list of nodes for comparison
+    major_node = migrated_individual
+    selected = selected_ind
+    nodes = [major_node, selected]
+    
+    while( len(nodes) < 22 ):
+        node = np.random.randint(0, G2.number_of_nodes()-1)
+        if( node != selected ):
+            nodes.append(node)
+            
+    #original_beliefs = []
+    #for node in nodes:
+    #    original_beliefs.append((node, G2.nodes[node]['beliefspace']))
+            
+    
+
+    
+    
+    
+    G2_belief = G2.graph['beliefspace']
+    
+    df_list = []
+    df_final = pd.DataFrame()
+    df_final2 = pd.DataFrame()
+    final_list = []
+    migrant_dis = []
+    rest_dis = []
+    final_sd = []
+    original = []
+    done = 0
+    
+    
+    df_weight = pd.DataFrame(columns=['iteration', 'node', 'average_weight', 'sd'])
+    df_distance = pd.DataFrame(columns=nodes)
+    df_friends = pd.DataFrame(columns=nodes)
+    
+    
+    
+    
+    
+    
+    
+    
+    # start of iterations
+    # i = 1
+    for iteration in range(50):
+        
+        pop2_belief = [0,0,0,0,0,0,0,0,0,0]
+        list_of_friends = []
+        fr = []
+        z = 0
+        df_col0 = []
+        df_col1 = []
+        df_col2 = []
+        df_col3 = []
+        df_final = pd.DataFrame()
+        df = pd.DataFrame()
+       
+        
+
+        
+        # belief spaces change
+        for i in G2.nodes:
+            acceptance_rate = G2.nodes[i]['acceptance']
+            talk_prob = np.random.rand()
+            for j in G2.neighbors(i):
+                number_of_friends = 0
+                sum_of_friends = 0
+                if (talk_prob <= G2.get_edge_data(i, j).get('weight')):
+                    talk = 1
+                else:
+                    talk = 0
+                if (talk == 1):
+                    item = np.random.randint(0, 10)
+                    if (np.random.rand()<= acceptance_rate):
+                            Norm_graph2= G2.graph['beliefspace'][item] * (1 - (G2.nodes[i]['distance_in'] / 100))
+                            Friend_belief= G2.nodes[j]['beliefspace'][item] * (1 - G2.get_edge_data(i, j).get('weight'))
+                            opinion= G2.nodes[i]['beliefspace'][item]
+                            if (i==migrated_individual):
+                                    Norm_graph1 = G1.graph['beliefspace'][item] * (1 - (G2.nodes[i]['distance_out'] / 100))
+                                    G2.nodes[i]['beliefspace'][item] = (((1- acceptance_rate) * opinion) + ((acceptance_rate) * ((Norm_graph1 + ((Norm_graph2 + Friend_belief)/2))/2)))
+                            else:
+                                    G2.nodes[i]['beliefspace'][item] = (((1- acceptance_rate) * opinion) + ((acceptance_rate) * ((Norm_graph2 + Friend_belief)/2)))
+
+
+        # G2 changes
+        for node in range(G2.number_of_nodes()):
+            for item1 in range(10):
+                pop2_belief[item1] = pop2_belief[item1] + G2.nodes[node]['beliefspace'][item1]
+        for item1 in range(10):
+            pop2_belief[item1] = np.around((pop2_belief[item1] / G2.number_of_nodes()), 0).astype(int)
+        G2.graph['beliefspace'] = pop2_belief
+        
+
+        # distance_in and out change
+        distance_in(G2)
+        distance_out(G2,G1)
+        
+
+        # G2_weight update
+        setWeight(G2)
+
+        # G2 weights and sd
+        pop2_weight = 0
+        list_of_weights2 = []
+
+        for i in G2.nodes:
+            for j in G2.neighbors(i):
+                pop2_weight += G2.get_edge_data(i, j).get('weight')
+                list_of_weights2.append(G2.get_edge_data(i, j).get('weight'))
+
+        pop2_weight = (pop2_weight / G2.number_of_edges())
+        G2.graph['weight'] = pop2_weight
+        G2.graph['sd'] = statistics.stdev(list_of_weights2)
+
+    
+        # finding new friends
+        for x in G2.neighbors(migrated_individual):
+            for friend in G2.neighbors(x):
+                if (friend != migrated_individual and friend not in fr):
+                    k2 = 0  # k = coefficient
+                    distance2 = 0  # abs(difference) of elements
+                    friends_dis = 0
+                    dis_friends_of_friends = 0
+                    for j in range(10):
+                        distance2 = abs(G2.nodes[migrated_individual]['beliefspace'][j] - G2.nodes[friend]['beliefspace'][j])
+                        if distance2 != 0:
+                            friends_dis += distance2
+                            k2 = (k2) + 1
+                    weight_friends_of_friends = ((k2) * (friends_dis / 100)) / 100
+                    if (weight_friends_of_friends <= G2.edges[migrated_individual, x]['weight']):
+                        if (np.random.rand() < G2.edges[migrated_individual, x]['weight']):
+                            another = (friend, weight_friends_of_friends)
+                            another = list(another)
+                            list_of_friends.append(another)
+                            fr.append(friend)
+        
+        
+        # adding new friends
+        if len(list_of_friends) != 0 :
+            selected_friend= np.random.randint(0, len(list_of_friends))
+            G2.add_edge(migrated_individual, list_of_friends[selected_friend][0], weight=list_of_friends[selected_friend][1])
+                
+                
+        
+        #appending new edgelist (weights)
+        with open(file_address + file_name + "_graph2_copy.edgelist", 'a') as f:
+            f.write("-----------------iteration" + str(iteration) + "---------------------" + "\n")
+            for node in G2.nodes:
+                for neighbor in G2.neighbors(node):
+                    w = G2.get_edge_data(node, neighbor).get('weight')
+                    f.write(str(node) + " " + str(neighbor) + " " + str(w) + "\n" )
+        
+        
+        #appending new attributes
+        with open(file_address + file_name + "_node_attr2_copy.txt", "a") as f:
+            f.write("-----------------iteration" + str(iteration) + "---------------------" + "\n")
+            for i in G2.nodes:
+                f.write(str(i) + ":" + str(G2.nodes[i]['beliefspace']) + "\n")
+
+        
+        
+        
+        # appending random node attributes, migrant attribute and G2 belief space after change
+        with open(file_address + file_name + ".txt", 'a') as f:
+                    f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+                    for node in nodes:
+                        if (node == migrated_individual):
+                            text = str(node) + " : " + str(G2.nodes[node]['beliefspace']) + " , " + "distance_in : " + str(
+                                G2.nodes[node]['distance_in']) + "\n \n" + str(list_of_friends) + "\n \n"
+                        else:
+                            text = str(node) + " : " + str(G2.nodes[node]['beliefspace']) + " , " + "distance_in : " + str(
+                                G2.nodes[node]['distance_in']) + "\n \n"
+                        f.write(text)
+                    f.write("G2_belief space" + str(G2.graph['beliefspace']) + " , " + "AVE-weight : " + str(
+                        G2.graph['weight']) + " , " + "sd : " + str(G2.graph['sd']) + "\n \n")
+        
+        
+        
+        #scenario1
+        with open(file_address  + file_name + "_new_friend.txt", 'a') as f:
+            #print(list(G2.neighbors(migrated_individual)))
+            #print(len(list(G2.neighbors(migrated_individual))))
+            if(done == 0): 
+                if(len(list(G2.neighbors(migrated_individual))) ==  2):
+                    it_new.append(iteration+1)
+                    done = 1
+                if(iteration == 49 and len(list(G2.neighbors(migrated_individual))) ==  1):
+                    it_new.append(0)
+                    
+                    
+        
+        
+        
+        #scenario2
+        with open(file_address + file_name + "_weight.txt", 'a') as f:
+            f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+            for node in nodes:
+                node_weight_info = []
+                weight_list = []
+                total_weight = 0
+                for neighbor in G2.neighbors(node):
+                    f.write(str(node) + "," + str(neighbor) + " : " + str(G2.edges[node,neighbor]['weight']) + "\n")
+                    total_weight += G2.edges[node,neighbor]['weight']
+                    weight_list.append(G2.edges[node,neighbor]['weight'])
+                ave_weight = total_weight/len(list(G2.neighbors(node)))
+                if( len(weight_list) > 1):
+                    sd = statistics.stdev(weight_list)
+                else:
+                    sd = 0
+                node_weight_info = [iteration, node, ave_weight, sd]
+                df_weight.loc[len(df_weight), :] =  node_weight_info
+                         
+            f.write("\n \n")
+        
+        
+        
+        
+        #scenario3
+        dis_row_list = []
+        
+        with open(file_address + file_name + "_dis.txt", 'a') as f:
+            f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+            for node in nodes:
+                dis_row_list.append(G2.nodes[node]['distance_in'])
+                f.write(str(node) + " : " + str(G2.nodes[node]['distance_in']) + "\n \n")
+                
+            df_distance.loc[len(df_distance), :] = dis_row_list
+            
+        
+        rest_ave = 0
+        standard_deviation = []
+        #with open(file_address + file_name + "_dis_ave.txt", 'a') as f:
+            #f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+        for node in nodes:
+            if(node == m):
+                migrant_dis.append(G2.nodes[migrated_individual]['distance_in'])
+            if(node != m):
+                rest_ave += G2.nodes[node]['distance_in']
+                standard_deviation.append(G2.nodes[node]['distance_in'])
+        rest_ave = rest_ave/(len(nodes) - 1)
+        rest_dis.append(rest_ave)
+        s_d = statistics.stdev(standard_deviation)
+        final_sd.append(s_d)
+        
+#         with open(file_address + file_name + "_yo.txt", 'a') as f:
+#             f.write(str(migrant_dis) + "-------------" + str(rest_dis))
+            
+            
+            
+        #scenario4
+        new_fr_list = []
+        with open(file_address + file_name + "_friends.txt", 'a') as f:
+            f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+            for node in nodes:
+                    new_fr_list.append(len(list(G2.neighbors(node))))
+                    f.write(str(node) + " : " + str(len(list(G2.neighbors(node)))) + "\n \n")
+            df_friends.loc[len(df_friends), :] = new_fr_list
+            
+           
+        
+        
+        #scenario5
+        #with open(file_address + file_name + "_original.txt", 'a') as f:
+        #f.write("-----------------iteration" + str(iteration + 1) + "---------------------" + "\n \n")
+        original.append(original_opinion())
+        
+    
+    #print(experiment , it_new)
+    next_df_original_opinion = pd.DataFrame({ "dis_to_original": original})
+    
+    
+            
+    next_df_distance_ave = pd.DataFrame({ "migrant": migrant_dis,
+                        "rest":rest_dis,
+                        "sd": final_sd})
+    
+    
+        
+    df_distance_ave = pd.concat([df_distance_ave, next_df_distance_ave], axis = 1)
+    
+    df_original_opinion = pd.concat([df_original_opinion, next_df_original_opinion], axis = 1)
+        
+    df_weight.to_csv(file_address + file_name + '_weight.csv')
+    df_distance.to_csv(file_address + file_name + '_dis.csv')
+    
+    df_friends.to_csv(file_address + file_name + '_friends.csv')
+    
+df_distance_ave.to_csv(file_address + file_name + '_dis_ave.csv')
+df_original_opinion.to_csv(file_address + file_name + '_original.csv')
+df_new_fr = pd.DataFrame({"new_connection_it": it_new })
+
+df_new_fr.to_csv(file_address + file_name + '_new_connection.csv')
+
+print("--- %s seconds ---" % (time.time() - start_time))
+
+with open(file_address + file_name + "time.txt", "w") as f:
+    f.write(str("--- %s seconds ---" % (time.time() - start_time)))
