@@ -1,0 +1,199 @@
+from networkx.generators.community import LFR_benchmark_graph
+import networkx as nx
+import matplotlib.pyplot as plt
+import numpy as np
+import statistics
+
+
+#initialization
+n = 200
+m = 230
+tau1 = 3
+tau2 = 1.5
+mu = 0.3
+
+pop1_belief = [0,0,0,0,0,0,0,0,0,0]
+pop2_belief = [0,0,0,0,0,0,0,0,0,0]
+
+
+#Creating Population 1
+G1 = LFR_benchmark_graph(n, tau1, tau2, mu, average_degree=15, min_community=20, seed=10)
+nx.set_node_attributes(G1, 0,  name="beliefspace")
+nx.set_node_attributes(G1, 1, name="Population")
+nx.set_node_attributes(G1, 0, name="acceptance")
+nx.set_edge_attributes(G1, 0, name="weight")
+
+
+
+#Creating Population 2
+G2 = LFR_benchmark_graph(m, tau1, tau2, mu, average_degree=15, min_community=40, seed=10)
+nx.set_node_attributes(G2, 0 , name="beliefspace")
+nx.set_node_attributes(G2, 2 , name="Population")
+nx.set_node_attributes(G2, 0, name="acceptance")
+nx.set_edge_attributes(G2, 0, name="weight")
+
+
+#set belief space for individuals in Population 1 
+for i in G1.nodes:
+    G1.nodes[i]['beliefspace'] = np.random.randint(100, size = 10)
+    
+
+    
+#set accessibility for individuals in Population 1 
+for i in G1.nodes:
+    G1.nodes[i]['acceptance'] = np.random.randint(10,50)
+
+    
+
+#calculating normative knowledge for population 1
+for node in range(n):
+    pop1_belief += G1.nodes[node]['beliefspace']
+
+pop1_belief = (np.around((pop1_belief/n), 0)).astype(int)
+
+
+
+#attributes of population1
+G1.graph['beliefspace'] = pop1_belief
+G1.graph['Population'] = 1
+
+
+
+#set belief space for individuals in Population 2 
+for i in G2.nodes:
+    G2.nodes[i]['beliefspace'] = np.random.randint(-80, 20, size = 10)
+    
+#set belief space for a community in pop2
+# communities = {frozenset(G2.nodes[v]["community"]) for v in G2}
+
+# com_list = list(communities)
+
+# for i in com_list[2]:
+#     G2.nodes[i]['beliefspace'] = np.random.randint(100, size = 10)
+    
+
+    
+#set accessibility for individuals in Population 2 
+for i in G2.nodes:
+    G2.nodes[i]['acceptance'] = np.random.randint(10, 50)
+
+
+    
+#calculating normative knowledge for population2
+for node in range(m):
+    for item1 in range(10):
+        pop2_belief[item1] = pop2_belief[item1] + G2.nodes[node]['beliefspace'][item1]
+for item1 in range(10):
+    pop2_belief[item1] = np.around((pop2_belief[item1]/m), 0).astype(int)
+
+
+
+#attributes of population2
+G2.graph['beliefspace'] = pop2_belief
+G2.graph['Population'] = 2
+
+
+
+#set edge weights 
+Total_dis = 0
+
+
+def setWeight(G):
+    for i in G.nodes:
+        for x in G.edges(i):
+            k = 0   # k = coefficient
+            distance = 0 # abs(difference) of elements
+            Total_dis = 0
+            for j in range(10):
+                distance = abs(G.nodes[i]['beliefspace'][j] - G.nodes[x[1]]['beliefspace'][j])
+                if distance != 0:
+                    Total_dis += distance
+                    k = k+1
+                else:
+                    continue
+            G.edges[i, x[1]]["weight"] = (k*(Total_dis/100))/100
+            
+        
+setWeight(G1)    
+setWeight(G2)
+
+
+
+#G1 weights and sd
+list_of_weights1 = []
+pop1_weight = 0
+
+
+for i in G1.nodes:
+    for j in G1.neighbors(i):
+        pop1_weight += G1.get_edge_data(i, j).get('weight')
+        list_of_weights1.append(G1.get_edge_data(i, j).get('weight'))
+    
+pop1_weight = (pop1_weight/G1.number_of_edges())
+
+
+G1.graph['weight'] = pop1_weight
+G1.graph['sd'] = statistics.stdev(list_of_weights1)
+
+
+
+
+#G2 weights and sd
+list_of_weights2 = []
+pop2_weight = 0
+
+
+for i in G2.nodes:
+    for j in G2.neighbors(i):
+        pop2_weight += G2.get_edge_data(i, j).get('weight')
+        list_of_weights2.append(G2.get_edge_data(i, j).get('weight'))
+    
+pop2_weight = (pop2_weight/G2.number_of_edges())
+
+
+
+G2.graph['weight'] = pop2_weight
+G2.graph['sd'] = statistics.stdev(list_of_weights2)
+
+
+
+
+
+#writing node attributes of Population 1 
+with open("project/node_attr1.txt", "w") as f:
+    for i in G1.nodes:
+        f.write(str(i) + ":" + str(G1.nodes[i]['beliefspace']) + ":" + str(G1.nodes[i]['acceptance']) + "\n")
+        
+#writing graph 1 structure
+nx.write_edgelist(G1, "project/graph1.edgelist", data=["weight"])   
+
+#writing graph 1 attribute  
+with open("project/graph1_attr.txt", "w") as f:
+        f.write(str(G1.graph['beliefspace']) + "\n")
+        f.write(str(G1.graph['weight']) + "\n")
+        f.write(str(G1.graph['sd']) + "\n")
+
+        
+        
+        
+#writing node attributes of Population 2 
+with open("project/node_attr2.txt", "w") as f:
+    for i in G2.nodes:
+        f.write(str(i) + ":" + str(G2.nodes[i]['beliefspace']) + ":" + str(G2.nodes[i]['acceptance']) + "\n")
+        
+#writing graph 2 structure
+nx.write_edgelist(G2, "project/graph2.edgelist", data=["weight"])    
+
+#writing graph 2 attribute  
+with open("project/graph2_attr.txt", "w") as f:
+        f.write(str(G2.graph['beliefspace']) + "\n")
+        f.write(str(G2.graph['weight']) + "\n")
+        f.write(str(G2.graph['sd']) + "\n")
+
+
+#print(com_list)  
+
+print(G2.number_of_edges())
+
+
+        
