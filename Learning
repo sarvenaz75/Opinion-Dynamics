@@ -20,5 +20,196 @@ for i in range(rows1):
         pop1_table[i][2] = np.random.randint(20, 50)
     else :
         pop1_table[i][2] = np.random.randint(-100, 100)
-    sum2 += pop1_table[i][2]       
+    sum2 += pop1_table[i][2]   
+    
+    def Observation_Function(iterations, migrant_node, para):   #another parameter, 0 = observation, 1 = action selection
+    
+    
+    
+    if( para == 1 ): # action selection
+        iterations == 1
+    
+    
+    action_selection = []
+    neighbour_num_actions = 0
+    neighbours_eligible_actions = 0
+    all_eligible_actions = []
+
+    #empty action table2 for the migrant
+#     G2.nodes[migrant_node]['action_table2'] = []
+    
+    #start of observation 
+    
+    #empty value attribute for all nodes
+    for it in range(iterations):
+        for i in G2.nodes:
+            G2.nodes[i]['value'] = 0
+
+        list_of_min_opinion = []
+        ind_action_selection = []
+        action_selection=[]
+        
+        #returning 20 possible actions in each iteration
+        list_of_min_opinion = random_task(20)
+        
+
+        for i in G2.nodes:    #func(nodes)
+
+            acceptable_actions = []
+            ind_action_selection = []
+            if( i != migrated_individual):
+                for action in list_of_min_opinion:  # check minimum requirement
+                    min_opinion_flag = 0
+                    for index in range(10): 
+                        if( G2.nodes[i]['beliefspace'][index] <= action[1][index] ):
+                            min_opinion_flag = min_opinion_flag + 1
+                    if( min_opinion_flag == 10 ):                   
+                         acceptable_actions.append([action[0], action[1], action[2]])
+                all_eligible_actions.append([i,acceptable_actions])
+#                 print(all_eligible_actions[0][0])
+                acceptable_actions.sort(key=takeThird, reverse=True)  # sort 5 best actions with higher rewards
+                best_actions = []
+#                 if ( i == 30):
+#                     print(acceptable_actions[0:5])
+                for k in acceptable_actions[0:5]:   # adding values to value attribute
+                    if(k != []):
+                        action_selection.append([i,k])
+                        G2.nodes[i]['value'] += k[2]
+#                 if( i == 30):
+#                     print("Node 30 actions" , action_selection)
+#                     for act in action_selection:
+#                         if(act[0] == 30):
+#                             print(act)  
+            elif ( para == 1):    # action selection for migrant node
+                mig_acc_actions = func2(list_of_min_opinion)
+                
+
+        for i in G2[migrant_node]: # search in the neighbor list of the migrated node
+            for j in action_selection: # start the search
+                 if ( i == j[0] and j[1] != []):   # if the node is a neighbor node
+                    if (j[1][0] not in List_of_actions(G2.nodes[migrant_node]['action_table2'])): #if action doesnt already exist in table2 of the migrant node
+                            G2.nodes[migrant_node]['action_table2'].append([j[1]])  #append it
+                    
+        
+        
+    
+    for mig_neighbour in G2[migrant_node]:
+        for o in all_eligible_actions:
+            if( mig_neighbour == o[0]):
+                neighbours_eligible_actions += len(o[1])
+#                 print(o[1])
+                
+    
+    neighbours_eligible_actions = neighbours_eligible_actions/len(G2[migrant_node])
+    
+    
+    print(neighbours_eligible_actions)
+#     for i in G2[migrant_node]: # search in the neighbor list of the migrated node
+#             for j in acceptable_actions: # start the search
+#                 if(i == j[0] and j[1] != []):
+#                     print(j)
+                    
+    if ( para == 1):
+        return([G2.nodes[migrant_node]['action_table2'], mig_acc_actions, neighbours_eligible_actions])
+    if ( para == 0):
+        return([G2.nodes[migrant_node]['action_table2'], neighbours_eligible_actions])
+
+def func2(l2):
+    
+
+    migrant_actions2 = []
+    migrant_actions1 = []
+    migrant_actions = []
+    
+    action_selection1 = []
+    
+    
+    #create a list of actions in action table 2 
+    for j in G2.nodes[migrated_individual]['action_table2']:
+            for p in j:
+                 if p[0] not in migrant_actions2:
+                        migrant_actions2.append(p[0])
+
+    #create a list of actions in action table 1
+    for j in G2.nodes[migrated_individual]['action_table1']:
+                 if j[0] not in migrant_actions1:
+                        migrant_actions1.append([j[0], j[1], j[2]])
+                    
+    for i in l2:
+            if i[0] in migrant_actions2: #if action i exists in action table 2 append it and its value to migrant actions
+                migrant_actions.append([i[0], i[1], i[2]])
+                
+
+            else:
+                for m in migrant_actions1: #if action i exists in action table 1 append it and the value of it in table 1 to migrant actions
+                    if( i[0] == m[0]):
+                        migrant_actions.append([i[0], i[1], m[2]])
+                        
+
+
+    acceptable_actions = []
+    ind_action_selection = []
+    
+    
+    
+#     print(migrant_actions,"--------------------")
+#     print(G2.nodes[migrated_individual]['beliefspace'])
+    
+    for action in migrant_actions:   # check  the minimum requirement for actions in migrant_actions
+                        
+#                         print(action[1])
+                        min_opinion_flag = 0
+                        for index in range(10):
+#                             print(G2.nodes[migrated_individual]['beliefspace'][index], "-------",action[1][index])
+                            if( G2.nodes[migrated_individual]['beliefspace'][index] <= action[1][index] ):
+                                min_opinion_flag = min_opinion_flag + 1
+#                         print(action, "------------" , min_opinion_flag)
+                        if( min_opinion_flag == 10 ):
+#                             print("Yeah")
+                            acceptable_actions.append([action[0], action[1], action[2]])
+    acceptable_actions.sort(key=takeThird, reverse=True)   #sort them by best value
+#                         print(acceptable_actions)
+    best_actions = []
+#                         print(action_selection1, "222222222222222222222222222222222")
+    count = 0
+#                         print("ACCEptable ACTIONS", acceptable_actions[0:5])
+#     if ( len(acceptable_actions)  > 5):
+#         for c in range(5):
+#             if ( acceptable_actions[c] != []):
+#                 action_selection1.append([migrated_individual, acceptable_actions[c]])
+                
+#     else:
+#         for c in range(len(acceptable_actions)):
+#                     if ( acceptable_actions[c] != []):
+#                             action_selection1.append([migrated_individual, acceptable_actions[c]])
+                            
+    for k in acceptable_actions[0:5]:  # select 5 best actions
+            count = count + 1
+            if(k != []):
+                    action_selection1.append([migrated_individual, k])
+#                         print(action_selection1, "\n")
+    
+#     print("Action Selection1", action_selection1, "\n")
+    
+#     print("List of min opinion", l2, "\n")
+    
+    
+    for act in action_selection1:
+            for p in l2:
+#                     print("------------------", act[1][0] , " ", p[0])
+                    if( act[1][0] == p[0]):   #if action exists in available actions
+#                             print("Yeeeeeeeeeeeeees")
+                            G2.nodes[migrated_individual]['value'] += p[2]   # add its value to value attribute 
+                            break
+                                
+#     print("------------------",action_selection1, "-------------------------------")
+    for j in action_selection1: # add 5 performed actions to table 2 of migrant 
+#                     print(j)
+                    if (j[1][0] not in List_of_actions(G2.nodes[migrated_individual]['action_table2']) and j[1] != []):
+                            G2.nodes[migrated_individual]['action_table2'].append([j[1]])                            
+#     print(len(acceptable_actions))
+#     print(acceptable_actions)
+    return(len(acceptable_actions))
+
+
 
